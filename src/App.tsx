@@ -1,405 +1,400 @@
-import { useMemo, useState } from "react";
+import { useState, useEffect } from 'react';
 
-type Tab = "undone" | "calendar";
-type Priority = "high" | "medium" | "low";
-
-type Todo = {
-  id: number;
+interface Todo {
+  id: string;
   title: string;
-  note: string;
-  dueDate: string;
+  date: string;
   time: string;
-  done: boolean;
-  priority: Priority;
-};
-
-const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-function dateKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  status: 'pending' | 'completed';
 }
 
-function addDays(baseDate: Date, days: number) {
-  const next = new Date(baseDate);
-  next.setDate(baseDate.getDate() + days);
-  return next;
-}
+const FIREBASE_URL = 'https://todolist-data-14734-default-rtdb.firebaseio.com/events.json';
 
-function monthLabel(date: Date) {
-  return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-}
-
-const now = new Date();
-const initialTodos: Todo[] = [
-  {
-    id: 1,
-    title: "Finalize sprint roadmap",
-    note: "Align priorities with product and design before standup.",
-    dueDate: dateKey(addDays(now, 0)),
-    time: "09:30",
-    done: false,
-    priority: "high",
-  },
-  {
-    id: 2,
-    title: "Pick up groceries",
-    note: "Get fruit, yogurt, oats, and coffee beans.",
-    dueDate: dateKey(addDays(now, 1)),
-    time: "18:00",
-    done: false,
-    priority: "medium",
-  },
-  {
-    id: 3,
-    title: "Yoga session",
-    note: "45-minute recovery class after work.",
-    dueDate: dateKey(addDays(now, 2)),
-    time: "20:00",
-    done: false,
-    priority: "low",
-  },
-  {
-    id: 4,
-    title: "Dentist appointment",
-    note: "Routine cleaning. Bring insurance card.",
-    dueDate: dateKey(addDays(now, 5)),
-    time: "11:15",
-    done: false,
-    priority: "high",
-  },
-  {
-    id: 5,
-    title: "Book flight to NYC",
-    note: "Compare evening departures and baggage options.",
-    dueDate: dateKey(addDays(now, 8)),
-    time: "15:45",
-    done: true,
-    priority: "medium",
-  },
-];
-
-export function App() {
-  const [activeTab, setActiveTab] = useState<Tab>("undone");
-  const [todos, setTodos] = useState<Todo[]>(initialTodos);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [displayMonth, setDisplayMonth] = useState<Date>(
-    new Date(now.getFullYear(), now.getMonth(), 1)
-  );
+function App() {
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [activeTab, setActiveTab] = useState<'undone' | 'calendar'>('undone');
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
-  const [newDate, setNewDate] = useState(dateKey(new Date()));
-  const [newTime, setNewTime] = useState("23:59");
+  const [newTitle, setNewTitle] = useState('');
+  const [newDate, setNewDate] = useState('');
+  const [newTime, setNewTime] = useState('23:59');
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  const undoneTodos = useMemo(() => todos.filter((todo) => !todo.done), [todos]);
-  const selectedDateEvents = useMemo(
-    () => todos.filter((todo) => todo.dueDate === dateKey(selectedDate)),
-    [selectedDate, todos]
-  );
+  // Fetch todos from Firebase
+  useEffect(() => {
+    fetchTodos();
+  }, []);
 
-  const monthCells = useMemo(() => {
-    const start = new Date(displayMonth.getFullYear(), displayMonth.getMonth(), 1);
-    const end = new Date(displayMonth.getFullYear(), displayMonth.getMonth() + 1, 0);
-    const totalDays = end.getDate();
-    const firstDay = start.getDay();
-    const cellCount = Math.ceil((firstDay + totalDays) / 7) * 7;
-
-    return Array.from({ length: cellCount }, (_, index) => {
-      const dayNumber = index - firstDay + 1;
-      if (dayNumber < 1 || dayNumber > totalDays) {
-        return null;
+  const fetchTodos = async () => {
+    try {
+      const response = await fetch(FIREBASE_URL);
+      const data = await response.json();
+      if (data) {
+        const todoList: Todo[] = Object.entries(data).map(([id, todo]: [string, any]) => ({
+          id,
+          title: todo.title,
+          date: todo.date,
+          time: todo.time,
+          status: todo.status || 'pending',
+        }));
+        setTodos(todoList);
       }
-
-      return new Date(displayMonth.getFullYear(), displayMonth.getMonth(), dayNumber);
-    });
-  }, [displayMonth]);
-
-  const toggleTodo = (id: number) => {
-    setTodos((current) => current.map((todo) => (todo.id === id ? { ...todo, done: !todo.done } : todo)));
+    } catch (error) {
+      console.error('Error fetching todos:', error);
+    }
   };
 
   const openModal = () => {
-    setNewTitle("");
-    setNewDate(dateKey(new Date()));
-    setNewTime("23:59");
+    setNewDate(selectedDate);
+    setNewTime('23:59');
+    setNewTitle('');
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
     setIsModalOpen(false);
+    setNewTitle('');
   };
 
-  const handleAddTodo = () => {
-    if (!newTitle.trim()) return;
-    const newTodo: Todo = {
-      id: Date.now(),
-      title: newTitle.trim(),
-      note: "",
-      dueDate: newDate,
+  const handleAddTodo = async () => {
+    if (!newTitle.trim() || !newDate) return;
+
+    const newTodo = {
+      title: newTitle,
+      date: newDate,
       time: newTime,
-      done: false,
-      priority: "medium",
+      status: 'pending',
     };
-    setTodos((current) => [...current, newTodo]);
-    closeModal();
+
+    try {
+      const response = await fetch(FIREBASE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newTodo),
+      });
+      const data = await response.json();
+      
+      const todoWithId: Todo = {
+        id: data.name,
+        title: newTodo.title,
+        date: newTodo.date,
+        time: newTodo.time,
+        status: newTodo.status as 'pending' | 'completed',
+      };
+      
+      setTodos([...todos, todoWithId]);
+      closeModal();
+    } catch (error) {
+      console.error('Error adding todo:', error);
+    }
   };
 
-  const previousMonth = () => {
-    setDisplayMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1));
+  const toggleTodoStatus = async (id: string, currentStatus: 'pending' | 'completed') => {
+    const newStatus = currentStatus === 'pending' ? 'completed' : 'pending';
+    
+    try {
+      await fetch(`https://todolist-data-14734-default-rtdb.firebaseio.com/events/${id}.json`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      
+      setTodos(todos.map(todo => 
+        todo.id === id ? { ...todo, status: newStatus } : todo
+      ));
+    } catch (error) {
+      console.error('Error updating todo:', error);
+    }
+  };
+
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDay = firstDay.getDay();
+    
+    const days: (number | null)[] = [];
+    for (let i = 0; i < startingDay; i++) {
+      days.push(null);
+    }
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push(i);
+    }
+    return days;
+  };
+
+  const formatDate = (day: number) => {
+    const year = currentMonth.getFullYear();
+    const month = String(currentMonth.getMonth() + 1).padStart(2, '0');
+    const dayStr = String(day).padStart(2, '0');
+    return `${year}-${month}-${dayStr}`;
+  };
+
+  const getTodosForDate = (date: string) => {
+    return todos.filter(todo => todo.date === date);
+  };
+
+  const prevMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
   };
 
   const nextMonth = () => {
-    setDisplayMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1));
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
   };
 
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                      'July', 'August', 'September', 'October', 'November', 'December'];
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  const undoneTodos = todos.filter(todo => todo.status === 'pending');
+  const selectedDateTodos = getTodosForDate(selectedDate);
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <main className="mx-auto max-w-md">
-        <header className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
-          <h1 className="text-xl font-bold text-gray-900">TodoList</h1>
-          <span className="text-sm font-medium text-gray-500">{new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</span>
-        </header>
+    <div className="min-h-screen bg-gray-100 pb-24">
+      {/* Header */}
+      <header className="bg-white shadow-sm sticky top-0 z-30">
+        <div className="max-w-md mx-auto px-4 py-4">
+          <h1 className="text-xl font-bold text-gray-800">TodoList</h1>
+          <p className="text-sm text-gray-500">{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+        </div>
+      </header>
 
-        <section className="flex-1 overflow-y-auto px-4 py-4">
-
-          {activeTab === "undone" ? (
-            <div className="space-y-3">
-              <div className="mb-4 rounded-lg bg-blue-50 p-4">
-                <p className="text-sm font-medium text-gray-600">Undone tasks</p>
-                <p className="text-2xl font-bold text-gray-900">{undoneTodos.length}</p>
+      {/* Main Content */}
+      <main className="max-w-md mx-auto px-4 py-4">
+        {activeTab === 'undone' ? (
+          <div>
+            <h2 className="text-lg font-semibold text-gray-700 mb-3">Undone Tasks ({undoneTodos.length})</h2>
+            {undoneTodos.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>No pending tasks</p>
               </div>
-
-              {undoneTodos.map((todo) => (
-                <article
-                  key={todo.id}
-                  className="mb-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <h2 className="text-base font-semibold text-gray-900">{todo.title}</h2>
-                      <p className="mt-1 text-sm text-gray-600">{todo.note}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => toggleTodo(todo.id)}
-                      className="mt-1 grid h-6 w-6 place-items-center rounded-full border-2 border-gray-300 text-gray-500 transition hover:border-green-500 hover:text-green-500"
-                      aria-label={`Mark ${todo.title} done`}
-                    >
-                      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.4}>
-                        <path d="M5 12l5 5 9-9" />
-                      </svg>
-                    </button>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between text-xs">
-                    <span className="rounded bg-gray-100 px-2 py-1 font-medium text-gray-700">
-                      {todo.dueDate} at {todo.time}
-                    </span>
-                    <span
-                      className={`rounded px-2 py-1 font-semibold ${
-                        todo.priority === "high"
-                          ? "bg-red-100 text-red-700"
-                          : todo.priority === "medium"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : "bg-green-100 text-green-700"
-                      }`}
-                    >
-                      {todo.priority}
-                    </span>
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <section className="rounded-lg border border-gray-200 bg-white p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={previousMonth}
-                    className="grid h-8 w-8 place-items-center rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    aria-label="Previous month"
-                  >
-                    <span aria-hidden>‹</span>
-                  </button>
-                  <h2 className="text-sm font-semibold text-gray-800">{monthLabel(displayMonth)}</h2>
-                  <button
-                    type="button"
-                    onClick={nextMonth}
-                    className="grid h-8 w-8 place-items-center rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    aria-label="Next month"
-                  >
-                    <span aria-hidden>›</span>
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-gray-500">
-                  {weekDays.map((day) => (
-                    <div key={day} className="py-1">
-                      {day}
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-1 grid grid-cols-7 gap-1">
-                  {monthCells.map((cellDate, i) => {
-                    if (!cellDate) {
-                      return <div key={`empty-${i}`} className="h-9" />;
-                    }
-
-                    const key = dateKey(cellDate);
-                    const isSelected = key === dateKey(selectedDate);
-                    const hasEvents = todos.some((todo) => todo.dueDate === key);
-
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setSelectedDate(cellDate)}
-                        className={`relative h-9 rounded text-sm font-medium transition ${
-                          isSelected
-                            ? "bg-blue-500 text-white"
-                            : "bg-gray-50 text-gray-700 hover:bg-blue-50"
-                        }`}
-                      >
-                        {cellDate.getDate()}
-                        {hasEvents ? (
-                          <span
-                            className={`absolute bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full ${
-                              isSelected ? "bg-white" : "bg-blue-500"
-                            }`}
-                          />
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-
-              <section className="space-y-3">
-                <h3 className="text-sm font-semibold text-gray-700">
-                  Events on {dateKey(selectedDate)}
-                </h3>
-                {selectedDateEvents.length > 0 ? (
-                  selectedDateEvents.map((event) => (
-                    <article
-                      key={event.id}
-                      className="mb-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
-                    >
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-semibold text-gray-900">{event.title}</h4>
-                        <span className="rounded bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">
-                          {event.time}
-                        </span>
+            ) : (
+              <div className="space-y-3">
+                {undoneTodos.map(todo => (
+                  <div key={todo.id} className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h3 className="font-medium text-gray-800">{todo.title}</h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {new Date(todo.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at {todo.time}
+                        </p>
                       </div>
-                      <p className="mt-1 text-sm text-gray-600">{event.note}</p>
-                      <p className="mt-2 text-xs font-medium text-gray-500">
-                        Status: {event.done ? "Completed" : "Pending"}
-                      </p>
-                    </article>
-                  ))
-                ) : (
-                  <div className="rounded-lg border border-dashed border-gray-300 bg-white p-4 text-center text-sm text-gray-500">
-                    No events for this date.
+                      <button
+                        onClick={() => toggleTodoStatus(todo.id, todo.status)}
+                        className="ml-3 w-6 h-6 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-green-500 transition-colors"
+                      >
+                      </button>
+                    </div>
                   </div>
-                )}
-              </section>
-            </div>
-          )}
-        </section>
-
-        <nav className="fixed bottom-0 left-0 right-0 border-t border-gray-200 bg-white px-4 py-2">
-          <div className="mx-auto max-w-md">
-            <div className="flex items-center justify-around">
-              <button
-                type="button"
-                onClick={() => setActiveTab("undone")}
-                className={`flex flex-1 flex-col items-center rounded-lg px-4 py-2 text-sm font-medium transition ${
-                  activeTab === "undone" ? "text-blue-600" : "text-gray-600"
-                }`}
-              >
-                <span className="text-xs">Undone</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("calendar")}
-                className={`flex flex-1 flex-col items-center rounded-lg px-4 py-2 text-sm font-medium transition ${
-                  activeTab === "calendar" ? "text-blue-600" : "text-gray-600"
-                }`}
-              >
-                <span className="text-xs">Calendar</span>
-              </button>
-              <button
-                type="button"
-                onClick={openModal}
-                className="flex flex-col items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-              >
-                <span className="text-lg">+</span>
-              </button>
-            </div>
+                ))}
+              </div>
+            )}
           </div>
-        </nav>
-
-        {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
-            <div className="w-full max-w-md rounded-t-xl border border-gray-200 bg-white p-6 shadow-xl">
-              <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Add New Event</h3>
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="grid h-8 w-8 place-items-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200"
-                  aria-label="Close"
-                >
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2}>
-                    <path d="M6 18L18 6M6 6l12 12" />
+        ) : (
+          <div>
+            {/* Calendar */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+              <div className="flex items-center justify-between mb-4">
+                <button onClick={prevMonth} className="p-2 hover:bg-gray-100 rounded-lg">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <span className="font-semibold text-gray-800">
+                  {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+                </span>
+                <button onClick={nextMonth} className="p-2 hover:bg-gray-100 rounded-lg">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </button>
               </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Title</label>
-                  <input
-                    type="text"
-                    value={newTitle}
-                    onChange={(e) => setNewTitle(e.target.value)}
-                    placeholder="Enter event title"
-                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    autoFocus
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Date</label>
-                  <input
-                    type="date"
-                    value={newDate}
-                    onChange={(e) => setNewDate(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Time (default: 23:59)</label>
-                  <input
-                    type="time"
-                    value={newTime}
-                    onChange={(e) => setNewTime(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleAddTodo}
-                  disabled={!newTitle.trim()}
-                  className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Add Event
-                </button>
+              
+              <div className="grid grid-cols-7 gap-1 mb-2">
+                {dayNames.map(day => (
+                  <div key={day} className="text-center text-xs font-medium text-gray-500 py-2">
+                    {day}
+                  </div>
+                ))}
               </div>
+              
+              <div className="grid grid-cols-7 gap-1">
+                {getDaysInMonth(currentMonth).map((day, index) => {
+                  const dateStr = day ? formatDate(day) : '';
+                  const hasEvent = day && getTodosForDate(dateStr).length > 0;
+                  const isSelected = dateStr === selectedDate;
+                  const isToday = dateStr === new Date().toISOString().split('T')[0];
+                  
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => day && setSelectedDate(formatDate(day))}
+                      disabled={!day}
+                      className={`
+                        aspect-square flex items-center justify-center text-sm rounded-lg relative
+                        ${!day ? 'invisible' : ''}
+                        ${isSelected ? 'bg-blue-500 text-white' : ''}
+                        ${isToday && !isSelected ? 'bg-blue-100 text-blue-600 font-semibold' : ''}
+                        ${!isSelected && !isToday ? 'hover:bg-gray-100 text-gray-700' : ''}
+                      `}
+                    >
+                      {day}
+                      {hasEvent && !isSelected && (
+                        <span className="absolute bottom-1 w-1 h-1 bg-blue-500 rounded-full"></span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Selected Date Events */}
+            <div>
+              <h2 className="text-lg font-semibold text-gray-700 mb-3">
+                Events for {new Date(selectedDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+              </h2>
+              {selectedDateTodos.length === 0 ? (
+                <div className="text-center py-8 text-gray-500 bg-white rounded-lg border border-gray-200">
+                  <p>No events for this date</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {selectedDateTodos.map(todo => (
+                    <div 
+                      key={todo.id} 
+                      className={`rounded-lg p-4 shadow-sm border ${
+                        todo.status === 'completed' 
+                          ? 'bg-green-500 border-green-600' 
+                          : 'bg-white border-gray-200'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h3 className={`font-medium ${
+                            todo.status === 'completed' ? 'text-white' : 'text-gray-800'
+                          }`}>
+                            {todo.title}
+                          </h3>
+                          <p className={`text-sm ${
+                            todo.status === 'completed' ? 'text-green-100' : 'text-gray-500'
+                          }`}>
+                            {todo.time}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => toggleTodoStatus(todo.id, todo.status)}
+                          className={`ml-3 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
+                            todo.status === 'completed' 
+                              ? 'border-white bg-white' 
+                              : 'border-gray-300 hover:border-green-500'
+                          }`}
+                        >
+                          {todo.status === 'completed' && (
+                            <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
       </main>
+
+      {/* Floating Navigation Bar */}
+      <nav className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white/80 backdrop-blur-md shadow-lg rounded-full border border-white/50 px-6 py-3 z-40">
+        <div className="flex items-center gap-8">
+          <button
+            onClick={() => setActiveTab('undone')}
+            className={`text-sm font-medium transition-colors ${
+              activeTab === 'undone' ? 'text-blue-500' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Undone
+          </button>
+          <button
+            onClick={() => setActiveTab('calendar')}
+            className={`text-sm font-medium transition-colors ${
+              activeTab === 'calendar' ? 'text-blue-500' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Calendar
+          </button>
+          <button
+            onClick={openModal}
+            className="w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-blue-600 transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
+        </div>
+      </nav>
+
+      {/* Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Add New Event</h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                <input
+                  type="text"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  placeholder="Enter event title"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                <input
+                  type="date"
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
+                <input
+                  type="time"
+                  value={newTime}
+                  onChange={(e) => setNewTime(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={closeModal}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddTodo}
+                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                Add Event
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+export default App;
