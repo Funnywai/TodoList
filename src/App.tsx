@@ -117,6 +117,32 @@ export function App() {
     setTodos((current) => current.map((todo) => (todo.id === id ? { ...todo, done: !todo.done } : todo)));
   };
 
+  const openModal = () => {
+    setNewTitle("");
+    setNewDate(dateKey(new Date()));
+    setNewTime("23:59");
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+  };
+
+  const handleAddTodo = () => {
+    if (!newTitle.trim()) return;
+    const newTodo: Todo = {
+      id: Date.now(),
+      title: newTitle.trim(),
+      note: "",
+      dueDate: newDate,
+      time: newTime,
+      done: false,
+      priority: "medium",
+    };
+    setTodos((current) => [...current, newTodo]);
+    closeModal();
+  };
+
   const previousMonth = () => {
     setDisplayMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1));
   };
@@ -126,47 +152,36 @@ export function App() {
   };
 
   return (
-    <div className="ios-shell min-h-screen px-4 py-8">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="blob blob-a" />
-        <div className="blob blob-b" />
-      </div>
-
-      <main className="relative mx-auto flex h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-[2.2rem] border border-white/50 bg-white/70 shadow-[0_24px_80px_rgba(20,24,51,0.22)] backdrop-blur-xl">
-        <header className="flex items-center justify-between px-6 pt-5 text-sm font-semibold text-slate-700">
-          <span>{new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>
-          <div className="h-6 w-36 rounded-full bg-slate-900/90" />
-          <span>100%</span>
+    <div className="min-h-screen bg-gray-50">
+      <main className="mx-auto max-w-md">
+        <header className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
+          <h1 className="text-xl font-bold text-gray-900">TodoList</h1>
+          <span className="text-sm font-medium text-gray-500">{new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</span>
         </header>
 
-        <section className="fade-up flex-1 overflow-y-auto px-5 pb-28 pt-6">
-          <div className="mb-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600">TodoList</p>
-            <h1 className="mt-1 text-3xl font-semibold text-slate-900">Focus Planner</h1>
-          </div>
+        <section className="flex-1 overflow-y-auto px-4 py-4">
 
           {activeTab === "undone" ? (
             <div className="space-y-3">
-              <div className="fade-up-delay rounded-3xl bg-gradient-to-r from-sky-500 to-cyan-400 p-4 text-white shadow-lg shadow-cyan-300/50">
-                <p className="text-sm text-white/90">Undone tasks</p>
-                <p className="text-3xl font-semibold">{undoneTodos.length}</p>
+              <div className="mb-4 rounded-lg bg-blue-50 p-4">
+                <p className="text-sm font-medium text-gray-600">Undone tasks</p>
+                <p className="text-2xl font-bold text-gray-900">{undoneTodos.length}</p>
               </div>
 
-              {undoneTodos.map((todo, index) => (
+              {undoneTodos.map((todo) => (
                 <article
                   key={todo.id}
-                  className="card-rise rounded-2xl border border-slate-200/80 bg-white/85 p-4 shadow-[0_10px_30px_rgba(15,23,42,0.08)]"
-                  style={{ animationDelay: `${120 + index * 80}ms` }}
+                  className="mb-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h2 className="text-base font-semibold text-slate-900">{todo.title}</h2>
-                      <p className="mt-1 text-sm text-slate-600">{todo.note}</p>
+                    <div className="flex-1">
+                      <h2 className="text-base font-semibold text-gray-900">{todo.title}</h2>
+                      <p className="mt-1 text-sm text-gray-600">{todo.note}</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => toggleTodo(todo.id)}
-                      className="mt-1 grid h-6 w-6 place-items-center rounded-full border-2 border-slate-300 text-slate-500 transition hover:border-emerald-500 hover:text-emerald-500"
+                      className="mt-1 grid h-6 w-6 place-items-center rounded-full border-2 border-gray-300 text-gray-500 transition hover:border-green-500 hover:text-green-500"
                       aria-label={`Mark ${todo.title} done`}
                     >
                       <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.4}>
@@ -175,16 +190,16 @@ export function App() {
                     </button>
                   </div>
                   <div className="mt-3 flex items-center justify-between text-xs">
-                    <span className="rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-700">
+                    <span className="rounded bg-gray-100 px-2 py-1 font-medium text-gray-700">
                       {todo.dueDate} at {todo.time}
                     </span>
                     <span
-                      className={`rounded-full px-3 py-1 font-semibold ${
+                      className={`rounded px-2 py-1 font-semibold ${
                         todo.priority === "high"
-                          ? "bg-rose-100 text-rose-700"
+                          ? "bg-red-100 text-red-700"
                           : todo.priority === "medium"
-                            ? "bg-amber-100 text-amber-700"
-                            : "bg-emerald-100 text-emerald-700"
+                            ? "bg-yellow-100 text-yellow-700"
+                            : "bg-green-100 text-green-700"
                       }`}
                     >
                       {todo.priority}
@@ -195,38 +210,38 @@ export function App() {
             </div>
           ) : (
             <div className="space-y-4">
-              <section className="fade-up-delay rounded-3xl border border-slate-200/80 bg-white/90 p-4 shadow-[0_12px_32px_rgba(18,43,63,0.08)]">
+              <section className="rounded-lg border border-gray-200 bg-white p-4">
                 <div className="mb-3 flex items-center justify-between">
                   <button
                     type="button"
                     onClick={previousMonth}
-                    className="grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-slate-700"
+                    className="grid h-8 w-8 place-items-center rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200"
                     aria-label="Previous month"
                   >
                     <span aria-hidden>‹</span>
                   </button>
-                  <h2 className="text-sm font-semibold tracking-wide text-slate-800">{monthLabel(displayMonth)}</h2>
+                  <h2 className="text-sm font-semibold text-gray-800">{monthLabel(displayMonth)}</h2>
                   <button
                     type="button"
                     onClick={nextMonth}
-                    className="grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-slate-700"
+                    className="grid h-8 w-8 place-items-center rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200"
                     aria-label="Next month"
                   >
                     <span aria-hidden>›</span>
                   </button>
                 </div>
 
-                <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-slate-500">
+                <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-gray-500">
                   {weekDays.map((day) => (
                     <div key={day} className="py-1">
                       {day}
                     </div>
                   ))}
                 </div>
-                <div className="mt-1 grid grid-cols-7 gap-1.5">
-                  {monthCells.map((cellDate, index) => {
+                <div className="mt-1 grid grid-cols-7 gap-1">
+                  {monthCells.map((cellDate, i) => {
                     if (!cellDate) {
-                      return <div key={`empty-${index}`} className="h-9" />;
+                      return <div key={`empty-${i}`} className="h-9" />;
                     }
 
                     const key = dateKey(cellDate);
@@ -238,17 +253,17 @@ export function App() {
                         key={key}
                         type="button"
                         onClick={() => setSelectedDate(cellDate)}
-                        className={`relative h-9 rounded-xl text-sm font-medium transition ${
+                        className={`relative h-9 rounded text-sm font-medium transition ${
                           isSelected
-                            ? "bg-sky-500 text-white shadow-md shadow-sky-300/60"
-                            : "bg-slate-50 text-slate-700 hover:bg-sky-50"
+                            ? "bg-blue-500 text-white"
+                            : "bg-gray-50 text-gray-700 hover:bg-blue-50"
                         }`}
                       >
                         {cellDate.getDate()}
                         {hasEvents ? (
                           <span
-                            className={`absolute bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${
-                              isSelected ? "bg-white" : "bg-cyan-500"
+                            className={`absolute bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full ${
+                              isSelected ? "bg-white" : "bg-blue-500"
                             }`}
                           />
                         ) : null}
@@ -259,30 +274,29 @@ export function App() {
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-sm font-semibold uppercase tracking-[0.15em] text-slate-500">
+                <h3 className="text-sm font-semibold text-gray-700">
                   Events on {dateKey(selectedDate)}
                 </h3>
                 {selectedDateEvents.length > 0 ? (
-                  selectedDateEvents.map((event, index) => (
+                  selectedDateEvents.map((event) => (
                     <article
                       key={event.id}
-                      className="card-rise rounded-2xl border border-slate-200/70 bg-white/90 p-4 shadow-[0_10px_30px_rgba(15,23,42,0.08)]"
-                      style={{ animationDelay: `${130 + index * 90}ms` }}
+                      className="mb-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
                     >
                       <div className="flex items-center justify-between">
-                        <h4 className="font-semibold text-slate-900">{event.title}</h4>
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                        <h4 className="font-semibold text-gray-900">{event.title}</h4>
+                        <span className="rounded bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">
                           {event.time}
                         </span>
                       </div>
-                      <p className="mt-1 text-sm text-slate-600">{event.note}</p>
-                      <p className="mt-2 text-xs font-medium text-slate-500">
+                      <p className="mt-1 text-sm text-gray-600">{event.note}</p>
+                      <p className="mt-2 text-xs font-medium text-gray-500">
                         Status: {event.done ? "Completed" : "Pending"}
                       </p>
                     </article>
                   ))
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-6 text-center text-sm text-slate-500">
+                  <div className="rounded-lg border border-dashed border-gray-300 bg-white p-4 text-center text-sm text-gray-500">
                     No events for this date.
                   </div>
                 )}
@@ -291,121 +305,93 @@ export function App() {
           )}
         </section>
 
-        <nav className="absolute inset-x-4 bottom-4 grid grid-cols-3 gap-2 rounded-2xl border border-white/70 bg-white/85 p-2 shadow-[0_8px_24px_rgba(15,23,42,0.1)] backdrop-blur">
-          <button
-            type="button"
-            onClick={() => setActiveTab("undone")}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-              activeTab === "undone" ? "bg-sky-500 text-white" : "text-slate-600"
-            }`}
-          >
-            Undone
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("calendar")}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-              activeTab === "calendar" ? "bg-sky-500 text-white" : "text-slate-600"
-            }`}
-          >
-            Calendar
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="rounded-xl px-4 py-2 text-sm font-semibold bg-gradient-to-r from-sky-500 to-cyan-500 text-white shadow-lg"
-          >
-            + Add
-          </button>
+        <nav className="fixed bottom-0 left-0 right-0 border-t border-gray-200 bg-white px-4 py-2">
+          <div className="mx-auto max-w-md">
+            <div className="flex items-center justify-around">
+              <button
+                type="button"
+                onClick={() => setActiveTab("undone")}
+                className={`flex flex-1 flex-col items-center rounded-lg px-4 py-2 text-sm font-medium transition ${
+                  activeTab === "undone" ? "text-blue-600" : "text-gray-600"
+                }`}
+              >
+                <span className="text-xs">Undone</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("calendar")}
+                className={`flex flex-1 flex-col items-center rounded-lg px-4 py-2 text-sm font-medium transition ${
+                  activeTab === "calendar" ? "text-blue-600" : "text-gray-600"
+                }`}
+              >
+                <span className="text-xs">Calendar</span>
+              </button>
+              <button
+                type="button"
+                onClick={openModal}
+                className="flex flex-col items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+              >
+                <span className="text-lg">+</span>
+              </button>
+            </div>
+          </div>
         </nav>
 
         {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-            <div
-              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
-              onClick={() => setIsModalOpen(false)}
-            />
-            <div className="relative w-full max-w-md rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-3xl animate-in slide-in-from-bottom-10 fade-in duration-200">
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
+            <div className="w-full max-w-md rounded-t-xl border border-gray-200 bg-white p-6 shadow-xl">
               <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-slate-900">Add New Event</h3>
+                <h3 className="text-lg font-semibold text-gray-900">Add New Event</h3>
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  onClick={closeModal}
+                  className="grid h-8 w-8 place-items-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200"
+                  aria-label="Close"
                 >
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2.4}>
-                    <path d="M6 6l12 12M6 18L18 6" />
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="title" className="mb-1 block text-sm font-medium text-slate-700">
-                    Title
-                  </label>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Title</label>
                   <input
-                    id="title"
                     type="text"
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
-                    placeholder="Event title"
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900 placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                    placeholder="Enter event title"
+                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     autoFocus
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label htmlFor="date" className="mb-1 block text-sm font-medium text-slate-700">
-                      Date
-                    </label>
-                    <input
-                      id="date"
-                      type="date"
-                      value={newDate}
-                      onChange={(e) => setNewDate(e.target.value)}
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="time" className="mb-1 block text-sm font-medium text-slate-700">
-                      Time
-                    </label>
-                    <input
-                      id="time"
-                      type="time"
-                      value={newTime}
-                      onChange={(e) => setNewTime(e.target.value)}
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                    />
-                  </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Date</label>
+                  <input
+                    type="date"
+                    value={newDate}
+                    onChange={(e) => setNewDate(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Time (default: 23:59)</label>
+                  <input
+                    type="time"
+                    value={newTime}
+                    onChange={(e) => setNewTime(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => {
-                    if (newTitle.trim()) {
-                      setTodos((prev) => [
-                        ...prev,
-                        {
-                          id: Date.now(),
-                          title: newTitle.trim(),
-                          note: "",
-                          dueDate: newDate,
-                          time: newTime,
-                          done: false,
-                          priority: "medium",
-                        },
-                      ]);
-                      setNewTitle("");
-                      setNewDate(dateKey(new Date()));
-                      setNewTime("23:59");
-                      setIsModalOpen(false);
-                    }
-                  }}
+                  onClick={handleAddTodo}
                   disabled={!newTitle.trim()}
-                  className="mt-2 w-full rounded-xl bg-gradient-to-r from-sky-500 to-cyan-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-300/40 transition enabled:hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Add Event
                 </button>
