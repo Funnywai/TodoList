@@ -6,13 +6,14 @@ interface Todo {
   date: string;
   time: string;
   status: 'pending' | 'completed';
+  completedDate?: string;
 }
 
 const FIREBASE_URL = 'https://todolist-data-14734-default-rtdb.firebaseio.com/events.json';
 
 function App() {
   const [todos, setTodos] = useState<Todo[]>([]);
-  const [activeTab, setActiveTab] = useState<'undone' | 'calendar'>('undone');
+  const [activeTab, setActiveTab] = useState<'mission' | 'calendar'>('mission');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -36,6 +37,7 @@ function App() {
           date: todo.date,
           time: todo.time,
           status: todo.status || 'pending',
+          completedDate: todo.completedDate,
         }));
         setTodos(todoList);
       }
@@ -90,17 +92,17 @@ function App() {
   };
 
   const toggleTodoStatus = async (id: string, currentStatus: 'pending' | 'completed') => {
-    const newStatus = currentStatus === 'pending' ? 'completed' : 'pending';
+    const completedDate = newStatus === 'completed' ? new Date().toISOString().split('T')[0] : undefined;
     
     try {
       await fetch(`https://todolist-data-14734-default-rtdb.firebaseio.com/events/${id}.json`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ status: newStatus, completedDate }),
       });
       
       setTodos(todos.map(todo => 
-        todo.id === id ? { ...todo, status: newStatus } : todo
+        todo.id === id ? { ...todo, status: newStatus, completedDate } : todo
       ));
     } catch (error) {
       console.error('Error updating todo:', error);
@@ -149,6 +151,11 @@ function App() {
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   const undoneTodos = todos.filter(todo => todo.status === 'pending');
+  const todayStr = new Date().toISOString().split('T')[0];
+  const missionTodos = [
+    ...undoneTodos,
+    ...todos.filter(todo => todo.status === 'completed' && todo.completedDate === todayStr)
+  ].sort((a, b) => a.time.localeCompare(b.time));
   const selectedDateTodos = getTodosForDate(selectedDate);
 
   return (
@@ -163,29 +170,55 @@ function App() {
 
       {/* Main Content */}
       <main className="max-w-md mx-auto px-4 py-4">
-        {activeTab === 'undone' ? (
+        {activeTab === 'mission' ? (
           <div>
-            <h2 className="text-lg font-semibold text-gray-700 mb-3">Undone Tasks ({undoneTodos.length})</h2>
-            {undoneTodos.length === 0 ? (
+            <h2 className="text-lg font-semibold text-gray-700 mb-3">Mission ({missionTodos.length})</h2>
+            {missionTodos.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
-                <p>No pending tasks</p>
+                <p>No missions for today</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {undoneTodos.map(todo => (
-                  <div key={todo.id} className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-                    <div className="flex items-start justify-between">
+                {missionTodos.map(todo => (
+                  <div 
+                    key={todo.id} 
+                    className={`rounded-lg p-4 shadow-sm border ${
+                      todo.status === 'completed' 
+                        ? 'bg-gray-100 border-gray-200' 
+                        : 'bg-white border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <button
+                        onClick={() => toggleTodoStatus(todo.id, todo.status)}
+                        className={`flex-shrink-0 mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
+                          todo.status === 'completed' 
+                            ? 'bg-green-500 border-green-500' 
+                            : 'border-gray-300 hover:border-green-500'
+                        }`}
+                      >
+                        {todo.status === 'completed' && (
+                          <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </button>
                       <div className="flex-1">
-                        <h3 className="font-medium text-gray-800">{todo.title}</h3>
-                        <p className="text-sm text-gray-500 mt-1">
+                        <h3 className={`font-medium ${
+                          todo.status === 'completed' 
+                            ? 'text-gray-500 line-through' 
+                            : 'text-gray-800'
+                        }`}>
+                          {todo.title}
+                        </h3>
+                        <p className={`text-sm mt-1 ${
+                          todo.status === 'completed' 
+                            ? 'text-gray-400' 
+                            : 'text-gray-500'
+                        }`}>
                           {new Date(todo.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at {todo.time}
                         </p>
                       </div>
-                      <button
-                        onClick={() => toggleTodoStatus(todo.id, todo.status)}
-                        className="ml-3 w-6 h-6 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-green-500 transition-colors"
-                      >
-                      </button>
                     </div>
                   </div>
                 ))}
@@ -311,12 +344,12 @@ function App() {
       <nav className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white/80 backdrop-blur-md shadow-lg rounded-full border border-white/50 px-6 py-3 z-40">
         <div className="flex items-center gap-8">
           <button
-            onClick={() => setActiveTab('undone')}
+            onClick={() => setActiveTab('mission')}
             className={`text-sm font-medium transition-colors ${
-              activeTab === 'undone' ? 'text-blue-500' : 'text-gray-500 hover:text-gray-700'
+              activeTab === 'mission' ? 'text-blue-500' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            Undone
+            Mission
           </button>
           <button
             onClick={() => setActiveTab('calendar')}
