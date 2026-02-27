@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type TouchEvent } from 'react';
 
 interface Todo {
   id: string;
@@ -24,6 +24,9 @@ function App() {
   const [newTime, setNewTime] = useState('23:59');
   const [newStatus, setNewStatus] = useState<'pending' | 'completed'>('pending');
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [swipedTodoId, setSwipedTodoId] = useState<string | null>(null);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchCurrentX, setTouchCurrentX] = useState<number | null>(null);
 
   useEffect(() => {
     fetchTodos();
@@ -144,17 +147,22 @@ function App() {
     }
   };
 
-  const handleDeleteTodo = async () => {
-    if (!editingTodoId) return;
+  const handleDeleteTodoById = async (id: string) => {
     try {
-      await fetch(`https://todolist-data-14734-default-rtdb.firebaseio.com/events/${editingTodoId}.json`, {
+      await fetch(`https://todolist-data-14734-default-rtdb.firebaseio.com/events/${id}.json`, {
         method: 'DELETE',
       });
-      setTodos(prev => prev.filter(todo => todo.id !== editingTodoId));
-      closeModal();
+      setTodos(prev => prev.filter(todo => todo.id !== id));
+      setSwipedTodoId(prev => (prev === id ? null : prev));
     } catch (error) {
       console.error('Error deleting todo:', error);
     }
+  };
+
+  const handleDeleteTodo = async () => {
+    if (!editingTodoId) return;
+    await handleDeleteTodoById(editingTodoId);
+    closeModal();
   };
 
   const toggleTodoStatus = async (id: string, currentStatus: 'pending' | 'completed') => {
@@ -201,43 +209,89 @@ function App() {
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const selectedDateTodos = getTodosForDate(selectedDate);
 
+  const handleCardTouchStart = (e: TouchEvent, id: string) => {
+    const startX = e.touches[0].clientX;
+    setTouchStartX(startX);
+    setTouchCurrentX(startX);
+    if (swipedTodoId && swipedTodoId !== id) {
+      setSwipedTodoId(null);
+    }
+  };
+
+  const handleCardTouchMove = (e: TouchEvent) => {
+    setTouchCurrentX(e.touches[0].clientX);
+  };
+
+  const handleCardTouchEnd = (id: string) => {
+    if (touchStartX === null || touchCurrentX === null) return;
+    const deltaX = touchCurrentX - touchStartX;
+
+    if (deltaX < -60) {
+      setSwipedTodoId(id);
+    } else if (deltaX > 40) {
+      setSwipedTodoId(null);
+    }
+
+    setTouchStartX(null);
+    setTouchCurrentX(null);
+  };
+
   const TaskCard = ({ todo }: { todo: Todo }) => (
-    <div
-      onClick={() => openEditModal(todo)}
-      className={`rounded-lg p-4 shadow-sm border cursor-pointer transition-colors ${
-        todo.status === 'completed'
-          ? 'bg-gray-100 border-gray-200'
-          : 'bg-white border-gray-200 hover:border-blue-300'
-      }`}
-    >
-      <div className="flex items-start gap-3">
-        <button
-          onClick={(e) => { e.stopPropagation(); toggleTodoStatus(todo.id, todo.status); }}
-          className={`mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200 ${
-            todo.status === 'completed'
-              ? 'border-gray-300 bg-gray-200'
-              : 'border-gray-300 hover:border-gray-400'
-          }`}
-        >
-          <svg
-            className={`w-3.5 h-3.5 text-gray-600 transition-all duration-200 ease-out ${
-              todo.status === 'completed' ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
+    <div className="relative overflow-hidden rounded-lg">
+      <button
+        onClick={() => handleDeleteTodoById(todo.id)}
+        className="absolute right-0 top-0 bottom-0 w-20 bg-red-500 text-white font-medium"
+      >
+        Delete
+      </button>
+      <div
+        onTouchStart={(e) => handleCardTouchStart(e, todo.id)}
+        onTouchMove={handleCardTouchMove}
+        onTouchEnd={() => handleCardTouchEnd(todo.id)}
+        onClick={() => {
+          if (swipedTodoId === todo.id) {
+            setSwipedTodoId(null);
+            return;
+          }
+          openEditModal(todo);
+        }}
+        className={`rounded-lg p-4 shadow-sm border cursor-pointer transition-all duration-200 relative z-10 ${
+          swipedTodoId === todo.id ? '-translate-x-20' : 'translate-x-0'
+        } ${
+          todo.status === 'completed'
+            ? 'bg-gray-100 border-gray-200'
+            : 'bg-white border-gray-200 hover:border-blue-300'
+        }`}
+      >
+        <div className="flex items-start gap-3">
+          <button
+            onClick={(e) => { e.stopPropagation(); toggleTodoStatus(todo.id, todo.status); }}
+            className={`mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200 ${
+              todo.status === 'completed'
+                ? 'border-gray-300 bg-gray-200'
+                : 'border-gray-300 hover:border-gray-400'
             }`}
-            fill="currentColor"
-            viewBox="0 0 20 20"
           >
-            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-          </svg>
-        </button>
-        <div className="flex-1 min-w-0">
-          <h3 className={`font-medium break-words ${
-            todo.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-800'
-          }`}>
-            {todo.title}
-          </h3>
-          <p className="text-sm text-gray-400 mt-1">
-            {new Date(todo.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {todo.time}
-          </p>
+            <svg
+              className={`w-3.5 h-3.5 text-gray-600 transition-all duration-200 ease-out ${
+                todo.status === 'completed' ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
+              }`}
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+          </button>
+          <div className="flex-1 min-w-0">
+            <h3 className={`font-medium break-words ${
+              todo.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-800'
+            }`}>
+              {todo.title}
+            </h3>
+            <p className="text-sm text-gray-400 mt-1">
+              {new Date(todo.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {todo.time}
+            </p>
+          </div>
         </div>
       </div>
     </div>
