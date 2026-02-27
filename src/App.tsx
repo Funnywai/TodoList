@@ -215,8 +215,8 @@ function App() {
           onClick={(e) => { e.stopPropagation(); toggleTodoStatus(todo.id, todo.status); }}
           className={`mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
             todo.status === 'completed'
-              ? 'border-green-500 bg-green-500'
-              : 'border-gray-300 hover:border-green-500'
+              ? 'border-gray-400 bg-gray-400'
+              : 'border-gray-300 hover:border-gray-400'
           }`}
         >
           {todo.status === 'completed' && (
