@@ -260,7 +260,6 @@ function App() {
             </h2>
             {todos.length === 0 ? (
               <div className="text-center py-12 text-gray-400 bg-white rounded-lg border border-gray-200">
-                <p className="text-4xl mb-2">📋</p>
                 <p>No tasks yet. Tap + to add one!</p>
               </div>
             ) : (
