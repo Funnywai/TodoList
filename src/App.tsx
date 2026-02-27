@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type PointerEvent } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface Todo {
   id: string;
@@ -10,7 +10,6 @@ interface Todo {
 
 const FIREBASE_URL = 'https://todolist-data-14734-default-rtdb.firebaseio.com/events.json';
 const COURSE_OPTIONS = ['CENG 3420', 'CSCI 3250', 'CSCI 3251', 'ELTU 3014', 'CSCI 3180', 'CSCI 3100'];
-const SWIPE_REVEAL_WIDTH = 80;
 
 function App() {
   const [todos, setTodos] = useState<Todo[]>([]);
@@ -25,18 +24,16 @@ function App() {
   const [newTime, setNewTime] = useState('23:59');
   const [newStatus, setNewStatus] = useState<'pending' | 'completed'>('pending');
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [swipedTodoId, setSwipedTodoId] = useState<string | null>(null);
-  const [draggingTodoId, setDraggingTodoId] = useState<string | null>(null);
-  const [dragOffsetX, setDragOffsetX] = useState(0);
-  const swipeStartXRef = useRef<number | null>(null);
-  const swipeStartOffsetRef = useRef(0);
-  const swipeTodoIdRef = useRef<string | null>(null);
-  const activePointerIdRef = useRef<number | null>(null);
-  const ignoreNextClickTodoIdRef = useRef<string | null>(null);
+  const missionInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchTodos();
   }, []);
+
+  useEffect(() => {
+    if (!isModalOpen) return;
+    missionInputRef.current?.focus();
+  }, [isModalOpen, modalMode]);
 
   const fetchTodos = async () => {
     try {
@@ -153,22 +150,17 @@ function App() {
     }
   };
 
-  const handleDeleteTodoById = async (id: string) => {
+  const handleDeleteTodo = async () => {
+    if (!editingTodoId) return;
     try {
-      await fetch(`https://todolist-data-14734-default-rtdb.firebaseio.com/events/${id}.json`, {
+      await fetch(`https://todolist-data-14734-default-rtdb.firebaseio.com/events/${editingTodoId}.json`, {
         method: 'DELETE',
       });
-      setTodos(prev => prev.filter(todo => todo.id !== id));
-      setSwipedTodoId(prev => (prev === id ? null : prev));
+      setTodos(prev => prev.filter(todo => todo.id !== editingTodoId));
+      closeModal();
     } catch (error) {
       console.error('Error deleting todo:', error);
     }
-  };
-
-  const handleDeleteTodo = async () => {
-    if (!editingTodoId) return;
-    await handleDeleteTodoById(editingTodoId);
-    closeModal();
   };
 
   const toggleTodoStatus = async (id: string, currentStatus: 'pending' | 'completed') => {
@@ -215,132 +207,43 @@ function App() {
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const selectedDateTodos = getTodosForDate(selectedDate);
 
-  const handleCardPointerDown = (e: PointerEvent<HTMLDivElement>, id: string) => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    activePointerIdRef.current = e.pointerId;
-    swipeStartXRef.current = e.clientX;
-    swipeStartOffsetRef.current = swipedTodoId === id ? -SWIPE_REVEAL_WIDTH : 0;
-    swipeTodoIdRef.current = id;
-    setDraggingTodoId(id);
-    setDragOffsetX(swipeStartOffsetRef.current);
-    if (swipedTodoId && swipedTodoId !== id) {
-      setSwipedTodoId(null);
-    }
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-
-  const handleCardPointerMove = (e: PointerEvent<HTMLDivElement>) => {
-    if (activePointerIdRef.current !== e.pointerId) return;
-    if (swipeStartXRef.current === null || swipeTodoIdRef.current === null) return;
-
-    const deltaX = e.clientX - swipeStartXRef.current;
-    const nextOffset = swipeStartOffsetRef.current + deltaX;
-    const clampedOffset = Math.min(0, Math.max(-SWIPE_REVEAL_WIDTH, nextOffset));
-    setDragOffsetX(clampedOffset);
-  };
-
-  const handleCardPointerEnd = (e: PointerEvent<HTMLDivElement>) => {
-    if (activePointerIdRef.current !== e.pointerId) return;
-    if (swipeStartXRef.current === null || swipeTodoIdRef.current === null) return;
-
-    const id = swipeTodoIdRef.current;
-    const finalOffset = draggingTodoId === id ? dragOffsetX : (swipedTodoId === id ? -SWIPE_REVEAL_WIDTH : 0);
-
-    if (finalOffset <= -SWIPE_REVEAL_WIDTH / 2) {
-      setSwipedTodoId(id);
-      ignoreNextClickTodoIdRef.current = id;
-    } else {
-      setSwipedTodoId(null);
-      ignoreNextClickTodoIdRef.current = id;
-    }
-
-    setDraggingTodoId(null);
-    setDragOffsetX(0);
-    activePointerIdRef.current = null;
-    swipeStartXRef.current = null;
-    swipeStartOffsetRef.current = 0;
-    swipeTodoIdRef.current = null;
-  };
-
-  const handleCardPointerCancel = () => {
-    setDraggingTodoId(null);
-    setDragOffsetX(0);
-    activePointerIdRef.current = null;
-    swipeStartXRef.current = null;
-    swipeStartOffsetRef.current = 0;
-    swipeTodoIdRef.current = null;
-  };
-
-  const getCardTranslateX = (id: string) => {
-    if (draggingTodoId === id) return dragOffsetX;
-    return swipedTodoId === id ? -SWIPE_REVEAL_WIDTH : 0;
-  };
-
   const TaskCard = ({ todo }: { todo: Todo }) => (
-    <div className="relative overflow-hidden rounded-lg">
-      <button
-        onClick={() => handleDeleteTodoById(todo.id)}
-        className="absolute right-0 top-0 bottom-0 w-20 bg-red-500 text-white font-medium"
-      >
-        Delete
-      </button>
-      <div
-        onPointerDown={(e) => handleCardPointerDown(e, todo.id)}
-        onPointerMove={handleCardPointerMove}
-        onPointerUp={handleCardPointerEnd}
-        onPointerCancel={handleCardPointerCancel}
-        onClick={() => {
-          if (ignoreNextClickTodoIdRef.current === todo.id) {
-            ignoreNextClickTodoIdRef.current = null;
-            return;
-          }
-          if (swipedTodoId === todo.id) {
-            setSwipedTodoId(null);
-            return;
-          }
-          openEditModal(todo);
-        }}
-        style={{
-          touchAction: 'pan-y',
-          transform: `translateX(${getCardTranslateX(todo.id)}px)`,
-          transition: draggingTodoId === todo.id ? 'none' : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
-          willChange: 'transform',
-        }}
-        className={`rounded-lg p-4 shadow-sm border cursor-pointer relative z-10 ${
-          todo.status === 'completed'
-            ? 'bg-gray-100 border-gray-200'
-            : 'bg-white border-gray-200 hover:border-blue-300'
-        }`}
-      >
-        <div className="flex items-start gap-3">
-          <button
-            onClick={(e) => { e.stopPropagation(); toggleTodoStatus(todo.id, todo.status); }}
-            className={`mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200 ${
-              todo.status === 'completed'
-                ? 'border-gray-300 bg-gray-200'
-                : 'border-gray-300 hover:border-gray-400'
+    <div
+      onClick={() => openEditModal(todo)}
+      className={`rounded-lg p-4 shadow-sm border cursor-pointer transition-colors ${
+        todo.status === 'completed'
+          ? 'bg-gray-100 border-gray-200'
+          : 'bg-white border-gray-200 hover:border-blue-300'
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <button
+          onClick={(e) => { e.stopPropagation(); toggleTodoStatus(todo.id, todo.status); }}
+          className={`mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200 ${
+            todo.status === 'completed'
+              ? 'border-gray-300 bg-gray-200'
+              : 'border-gray-300 hover:border-gray-400'
+          }`}
+        >
+          <svg
+            className={`w-3.5 h-3.5 text-gray-600 transition-all duration-200 ease-out ${
+              todo.status === 'completed' ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
             }`}
+            fill="currentColor"
+            viewBox="0 0 20 20"
           >
-            <svg
-              className={`w-3.5 h-3.5 text-gray-600 transition-all duration-200 ease-out ${
-                todo.status === 'completed' ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
-              }`}
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-            </svg>
-          </button>
-          <div className="flex-1 min-w-0">
-            <h3 className={`font-medium break-words ${
-              todo.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-800'
-            }`}>
-              {todo.title}
-            </h3>
-            <p className="text-sm text-gray-400 mt-1">
-              {new Date(todo.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {todo.time}
-            </p>
-          </div>
+            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+          </svg>
+        </button>
+        <div className="flex-1 min-w-0">
+          <h3 className={`font-medium break-words ${
+            todo.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-800'
+          }`}>
+            {todo.title}
+          </h3>
+          <p className="text-sm text-gray-400 mt-1">
+            {new Date(todo.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {todo.time}
+          </p>
         </div>
       </div>
     </div>
@@ -509,6 +412,7 @@ function App() {
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1">Mission</label>
                 <input
+                  ref={missionInputRef}
                   type="text"
                   value={newMission}
                   onChange={(e) => setNewMission(e.target.value)}
