@@ -10,6 +10,7 @@ interface Todo {
 
 const FIREBASE_URL = 'https://todolist-data-14734-default-rtdb.firebaseio.com/events.json';
 const COURSE_OPTIONS = ['CENG 3420', 'CSCI 3250', 'CSCI 3251', 'ELTU 3014', 'CSCI 3180', 'CSCI 3100'];
+const SWIPE_REVEAL_WIDTH = 80;
 
 function App() {
   const [todos, setTodos] = useState<Todo[]>([]);
@@ -25,7 +26,10 @@ function App() {
   const [newStatus, setNewStatus] = useState<'pending' | 'completed'>('pending');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [swipedTodoId, setSwipedTodoId] = useState<string | null>(null);
+  const [draggingTodoId, setDraggingTodoId] = useState<string | null>(null);
+  const [dragOffsetX, setDragOffsetX] = useState(0);
   const swipeStartXRef = useRef<number | null>(null);
+  const swipeStartOffsetRef = useRef(0);
   const swipeTodoIdRef = useRef<string | null>(null);
   const activePointerIdRef = useRef<number | null>(null);
   const ignoreNextClickTodoIdRef = useRef<string | null>(null);
@@ -215,7 +219,10 @@ function App() {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     activePointerIdRef.current = e.pointerId;
     swipeStartXRef.current = e.clientX;
+    swipeStartOffsetRef.current = swipedTodoId === id ? -SWIPE_REVEAL_WIDTH : 0;
     swipeTodoIdRef.current = id;
+    setDraggingTodoId(id);
+    setDragOffsetX(swipeStartOffsetRef.current);
     if (swipedTodoId && swipedTodoId !== id) {
       setSwipedTodoId(null);
     }
@@ -225,6 +232,11 @@ function App() {
   const handleCardPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     if (activePointerIdRef.current !== e.pointerId) return;
     if (swipeStartXRef.current === null || swipeTodoIdRef.current === null) return;
+
+    const deltaX = e.clientX - swipeStartXRef.current;
+    const nextOffset = swipeStartOffsetRef.current + deltaX;
+    const clampedOffset = Math.min(0, Math.max(-SWIPE_REVEAL_WIDTH, nextOffset));
+    setDragOffsetX(clampedOffset);
   };
 
   const handleCardPointerEnd = (e: PointerEvent<HTMLDivElement>) => {
@@ -232,25 +244,36 @@ function App() {
     if (swipeStartXRef.current === null || swipeTodoIdRef.current === null) return;
 
     const id = swipeTodoIdRef.current;
-    const deltaX = e.clientX - swipeStartXRef.current;
+    const finalOffset = draggingTodoId === id ? dragOffsetX : (swipedTodoId === id ? -SWIPE_REVEAL_WIDTH : 0);
 
-    if (deltaX < -60) {
+    if (finalOffset <= -SWIPE_REVEAL_WIDTH / 2) {
       setSwipedTodoId(id);
       ignoreNextClickTodoIdRef.current = id;
-    } else if (deltaX > 40) {
+    } else {
       setSwipedTodoId(null);
       ignoreNextClickTodoIdRef.current = id;
     }
 
+    setDraggingTodoId(null);
+    setDragOffsetX(0);
     activePointerIdRef.current = null;
     swipeStartXRef.current = null;
+    swipeStartOffsetRef.current = 0;
     swipeTodoIdRef.current = null;
   };
 
   const handleCardPointerCancel = () => {
+    setDraggingTodoId(null);
+    setDragOffsetX(0);
     activePointerIdRef.current = null;
     swipeStartXRef.current = null;
+    swipeStartOffsetRef.current = 0;
     swipeTodoIdRef.current = null;
+  };
+
+  const getCardTranslateX = (id: string) => {
+    if (draggingTodoId === id) return dragOffsetX;
+    return swipedTodoId === id ? -SWIPE_REVEAL_WIDTH : 0;
   };
 
   const TaskCard = ({ todo }: { todo: Todo }) => (
@@ -277,10 +300,13 @@ function App() {
           }
           openEditModal(todo);
         }}
-        style={{ touchAction: 'pan-y' }}
-        className={`rounded-lg p-4 shadow-sm border cursor-pointer transition-all duration-200 relative z-10 ${
-          swipedTodoId === todo.id ? '-translate-x-20' : 'translate-x-0'
-        } ${
+        style={{
+          touchAction: 'pan-y',
+          transform: `translateX(${getCardTranslateX(todo.id)}px)`,
+          transition: draggingTodoId === todo.id ? 'none' : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+          willChange: 'transform',
+        }}
+        className={`rounded-lg p-4 shadow-sm border cursor-pointer relative z-10 ${
           todo.status === 'completed'
             ? 'bg-gray-100 border-gray-200'
             : 'bg-white border-gray-200 hover:border-blue-300'
