@@ -92,6 +92,7 @@ function App() {
   };
 
   const toggleTodoStatus = async (id: string, currentStatus: 'pending' | 'completed') => {
+    const newStatus = currentStatus === 'pending' ? 'completed' : 'pending';
     const completedDate = newStatus === 'completed' ? new Date().toISOString().split('T')[0] : undefined;
     
     try {
