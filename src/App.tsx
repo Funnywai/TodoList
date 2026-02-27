@@ -213,17 +213,21 @@ function App() {
       <div className="flex items-start gap-3">
         <button
           onClick={(e) => { e.stopPropagation(); toggleTodoStatus(todo.id, todo.status); }}
-          className={`mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+          className={`mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200 ${
             todo.status === 'completed'
-              ? 'border-gray-400 bg-gray-400'
+              ? 'border-gray-300 bg-gray-200'
               : 'border-gray-300 hover:border-gray-400'
           }`}
         >
-          {todo.status === 'completed' && (
-            <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-            </svg>
-          )}
+          <svg
+            className={`w-3.5 h-3.5 text-gray-600 transition-all duration-200 ease-out ${
+              todo.status === 'completed' ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
+            }`}
+            fill="currentColor"
+            viewBox="0 0 20 20"
+          >
+            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+          </svg>
         </button>
         <div className="flex-1 min-w-0">
           <h3 className={`font-medium break-words ${
@@ -333,7 +337,6 @@ function App() {
               </h2>
               {selectedDateTodos.length === 0 ? (
                 <div className="text-center py-10 text-gray-400 bg-white rounded-lg border border-gray-200">
-                  <p className="text-3xl mb-2">📅</p>
                   <p>No events for this date</p>
                 </div>
               ) : (
@@ -426,7 +429,7 @@ function App() {
                   type="date"
                   value={newDate}
                   onChange={(e) => setNewDate(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-800"
+                  className="no-date-icon w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-800"
                 />
               </div>
 
@@ -437,7 +440,7 @@ function App() {
                   type="time"
                   value={newTime}
                   onChange={(e) => setNewTime(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-800"
+                  className="no-time-icon w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-800"
                 />
               </div>
 
