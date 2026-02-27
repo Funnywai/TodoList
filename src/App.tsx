@@ -1,4 +1,4 @@
-import { useState, useEffect, type TouchEvent } from 'react';
+import { useState, useEffect, useRef, type PointerEvent } from 'react';
 
 interface Todo {
   id: string;
@@ -25,8 +25,10 @@ function App() {
   const [newStatus, setNewStatus] = useState<'pending' | 'completed'>('pending');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [swipedTodoId, setSwipedTodoId] = useState<string | null>(null);
-  const [touchStartX, setTouchStartX] = useState<number | null>(null);
-  const [touchCurrentX, setTouchCurrentX] = useState<number | null>(null);
+  const swipeStartXRef = useRef<number | null>(null);
+  const swipeTodoIdRef = useRef<string | null>(null);
+  const activePointerIdRef = useRef<number | null>(null);
+  const ignoreNextClickTodoIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     fetchTodos();
@@ -209,31 +211,46 @@ function App() {
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const selectedDateTodos = getTodosForDate(selectedDate);
 
-  const handleCardTouchStart = (e: TouchEvent, id: string) => {
-    const startX = e.touches[0].clientX;
-    setTouchStartX(startX);
-    setTouchCurrentX(startX);
+  const handleCardPointerDown = (e: PointerEvent<HTMLDivElement>, id: string) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    activePointerIdRef.current = e.pointerId;
+    swipeStartXRef.current = e.clientX;
+    swipeTodoIdRef.current = id;
     if (swipedTodoId && swipedTodoId !== id) {
       setSwipedTodoId(null);
     }
+    e.currentTarget.setPointerCapture(e.pointerId);
   };
 
-  const handleCardTouchMove = (e: TouchEvent) => {
-    setTouchCurrentX(e.touches[0].clientX);
+  const handleCardPointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (activePointerIdRef.current !== e.pointerId) return;
+    if (swipeStartXRef.current === null || swipeTodoIdRef.current === null) return;
   };
 
-  const handleCardTouchEnd = (id: string) => {
-    if (touchStartX === null || touchCurrentX === null) return;
-    const deltaX = touchCurrentX - touchStartX;
+  const handleCardPointerEnd = (e: PointerEvent<HTMLDivElement>) => {
+    if (activePointerIdRef.current !== e.pointerId) return;
+    if (swipeStartXRef.current === null || swipeTodoIdRef.current === null) return;
+
+    const id = swipeTodoIdRef.current;
+    const deltaX = e.clientX - swipeStartXRef.current;
 
     if (deltaX < -60) {
       setSwipedTodoId(id);
+      ignoreNextClickTodoIdRef.current = id;
     } else if (deltaX > 40) {
       setSwipedTodoId(null);
+      ignoreNextClickTodoIdRef.current = id;
     }
 
-    setTouchStartX(null);
-    setTouchCurrentX(null);
+    activePointerIdRef.current = null;
+    swipeStartXRef.current = null;
+    swipeTodoIdRef.current = null;
+  };
+
+  const handleCardPointerCancel = () => {
+    activePointerIdRef.current = null;
+    swipeStartXRef.current = null;
+    swipeTodoIdRef.current = null;
   };
 
   const TaskCard = ({ todo }: { todo: Todo }) => (
@@ -245,16 +262,22 @@ function App() {
         Delete
       </button>
       <div
-        onTouchStart={(e) => handleCardTouchStart(e, todo.id)}
-        onTouchMove={handleCardTouchMove}
-        onTouchEnd={() => handleCardTouchEnd(todo.id)}
+        onPointerDown={(e) => handleCardPointerDown(e, todo.id)}
+        onPointerMove={handleCardPointerMove}
+        onPointerUp={handleCardPointerEnd}
+        onPointerCancel={handleCardPointerCancel}
         onClick={() => {
+          if (ignoreNextClickTodoIdRef.current === todo.id) {
+            ignoreNextClickTodoIdRef.current = null;
+            return;
+          }
           if (swipedTodoId === todo.id) {
             setSwipedTodoId(null);
             return;
           }
           openEditModal(todo);
         }}
+        style={{ touchAction: 'pan-y' }}
         className={`rounded-lg p-4 shadow-sm border cursor-pointer transition-all duration-200 relative z-10 ${
           swipedTodoId === todo.id ? '-translate-x-20' : 'translate-x-0'
         } ${
